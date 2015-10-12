@@ -10,6 +10,14 @@ import org.testng.annotations.Test;
 @SuppressWarnings("javadoc")
 public class ByteArrayAdapterTest {
 
+	@Test(dataProviderClass = DataProviders.class, dataProvider = "initialDataAndPositionToGetWithExpectedOfGetByteUnitValue")
+	public void getByteUnitValue_GetsTheValueFromSpecifiedPosition(String initial, int offset, int length, String expected) {
+
+		ByteArrayAdapter tested = new ByteArrayAdapter(parse(initial));
+
+		assertEquals(print(tested.getByteUnitValue(offset, length)), expected);
+	}
+
 	@Test(dataProviderClass = DataProviders.class, dataProvider = "initialDataAndPositionToGetWithExpectedOfGetByteUnitValueAsInt")
 	public void getByteUnitValueAsInt_GetsTheValueFromSpecifiedPosition(String initial, int offset, int length, int expected) {
 
@@ -61,17 +69,28 @@ public class ByteArrayAdapterTest {
 		assertEquals(tested.getUnsignedBitUnitValueAsInt(offset, length), expected);
 	}
 
+	@Test(dataProviderClass = DataProviders.class, dataProvider = "initialDataAndValueToBeSetWithExpectedOfSetByteUnitValueTakingByteArrayValue")
+	public void setByteUnitValueTakingByteArrayValue_SetsTheValueToSpecifiedPosition(String initial, String value, int offset,
+			String expected) {
+
+		ByteArrayAdapter tested = new ByteArrayAdapter(parse(initial));
+
+		tested.setByteUnitValue(parse(value), offset);
+
+		assertEquals(print(tested.getData()), expected);
+	}
+
 	@Test(dataProviderClass = DataProviders.class, dataProvider = "dataSizeAndOutOfRangePosition", expectedExceptions = IllegalArgumentException.class)
-	public void setByteUnitValue_OffsetOrLengthIsOutOfRange_ThrownException(int dataSize, int offset, int length) {
+	public void setByteUnitValueTakingIntValue_OffsetOrLengthIsOutOfRange_ThrownException(int dataSize, int offset, int length) {
 
 		ByteArrayAdapter tested = new ByteArrayAdapter(new byte[dataSize]);
 
 		tested.setByteUnitValue(0xFF, offset, length);
 	}
 
-	@Test(dataProviderClass = DataProviders.class, dataProvider = "initialDataAndValueToBeSetWithExpectedOfSetByteUnitValue")
-	public void setByteUnitValue_SetsTheValueToSpecifiedPosition(String initial, int value, int offset, int length,
-			String expected) {
+	@Test(dataProviderClass = DataProviders.class, dataProvider = "initialDataAndValueToBeSetWithExpectedOfSetByteUnitValueTakingIntValue")
+	public void setByteUnitValueTakingIntValue_SetsTheValueToSpecifiedPosition(String initial, int value, int offset,
+			int length, String expected) {
 
 		ByteArrayAdapter tested = new ByteArrayAdapter(parse(initial));
 
@@ -119,6 +138,22 @@ public class ByteArrayAdapterTest {
 	}
 
 	static class DataProviders {
+
+		@DataProvider
+		static Object[][] initialDataAndPositionToGetWithExpectedOfGetByteUnitValue() {
+			return new Object[][] {// @formatter:off
+					{ "00 AB CD EF 00", 0, 1, "00" },
+					{ "00 AB CD EF 00", 0, 2, "00 AB" },
+					{ "00 AB CD EF 00", 0, 3, "00 AB CD" },
+					{ "00 AB CD EF 00", 0, 4, "00 AB CD EF" },
+					{ "00 AB CD EF 00", 0, 5, "00 AB CD EF 00" },
+					{ "00 AB CD EF 00", 1, 1, "AB" },
+					{ "00 AB CD EF 00", 1, 2, "AB CD" },
+					{ "00 AB CD EF 00", 1, 3, "AB CD EF" },
+					{ "00 AB CD EF 00", 1, 4, "AB CD EF 00" },
+					{ "00 AB CD EF 00", 4, 1, "00" },
+			}; // @formatter:on
+		}
 
 		@DataProvider
 		static Object[][] initialDataAndPositionToGetWithExpectedOfGetByteUnitValueAsInt() {
@@ -305,7 +340,17 @@ public class ByteArrayAdapterTest {
 		}
 
 		@DataProvider
-		static Object[][] initialDataAndValueToBeSetWithExpectedOfSetByteUnitValue() {
+		static Object[][] initialDataAndValueToBeSetWithExpectedOfSetByteUnitValueTakingByteArrayValue() {
+			return new Object[][] {// @formatter:off
+					{ "00 00 00 00 00", "FF FF", 0, "FF FF 00 00 00" },
+					{ "00 00 00 00 00", "FF FF", 1, "00 FF FF 00 00" },
+					{ "00 00 00 00 00", "FF FF", 2, "00 00 FF FF 00" },
+					{ "00 00 00 00 00", "FF FF", 3, "00 00 00 FF FF" },
+			}; // @formatter:on
+		}
+
+		@DataProvider
+		static Object[][] initialDataAndValueToBeSetWithExpectedOfSetByteUnitValueTakingIntValue() {
 			return new Object[][] {// @formatter:off
 					{ "00 00 00 00 00", 0xABCD, 0, 1, "CD 00 00 00 00" },
 					{ "00 00 00 00 00", 0xABCD, 1, 1, "00 CD 00 00 00" },

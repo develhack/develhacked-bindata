@@ -2,7 +2,10 @@ package com.develhack.bindata;
 
 import static com.develhack.Conditions.checkInRange;
 
+import java.util.Arrays;
+
 import com.develhack.annotation.assertion.InRange;
+import com.develhack.annotation.assertion.Nonempty;
 import com.develhack.annotation.assertion.Nonnull;
 import com.develhack.annotation.feature.Accessible;
 
@@ -14,6 +17,15 @@ public class ByteArrayAdapter {
 
 	public ByteArrayAdapter(@Nonnull byte[] data) {
 		this.data = data;
+	}
+
+	public byte[] getByteUnitValue(@InRange(from = "0", to = "data.length - 1") int byteOffset,
+			@InRange(from = "1", to = "data.length - byteOffset") int byteLength) {
+
+		checkInRange("byteOffset", byteOffset, 0, data.length - 1);
+		checkInRange("byteLength", byteLength, 1, data.length - byteOffset);
+
+		return Arrays.copyOfRange(data, byteOffset, byteOffset + byteLength);
 	}
 
 	public int getByteUnitValueAsInt(@InRange(from = "0", to = "data.length - 1") int byteOffset,
@@ -71,6 +83,14 @@ public class ByteArrayAdapter {
 		int bitOffsetInFirstByte = ((int) bitOffset) & 7;
 
 		return getBitUnitValueAsInt(bitOffset, bitLength, true);
+	}
+
+	public void setByteUnitValue(@Nonempty byte[] value,
+ @InRange(from = "0", to = "data.length - value.length") int byteOffset) {
+
+		checkInRange("byteOffset", byteOffset, 0, data.length - value.length);
+
+		System.arraycopy(value, 0, data, byteOffset, value.length);
 	}
 
 	public void setByteUnitValue(int value, @InRange(from = "0", to = "data.length - 1") int byteOffset,
