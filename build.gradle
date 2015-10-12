@@ -1,0 +1,184 @@
+buildscript {
+	repositories {
+		mavenCentral()
+		maven {
+			url 'https://plugins.gradle.org/m2/'
+		}
+	}
+
+	dependencies {
+		classpath 'com.develhack:gradle-eclipse-plugin:+'
+		classpath 'org.asciidoctor:asciidoctor-gradle-plugin:1.5.2'
+		classpath 'org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.0.1'
+		classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:+'
+	}
+}
+
+apply plugin: 'java'
+apply plugin: 'jacoco'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+apply plugin: 'com.develhack.eclipse'
+apply plugin: 'org.asciidoctor.convert'
+apply plugin: 'com.github.kt3k.coveralls'
+apply plugin: 'com.jfrog.bintray'
+
+group = 'com.develhack'
+archivesBaseName = 'develhacked-bindata'
+version = '0.0.1'
+
+sourceCompatibility = 1.6
+targetCompatibility = 1.6
+
+configurations {
+	apt {
+		visible false
+	}
+	asciidoclet
+}
+
+repositories {
+	mavenLocal()
+	jcenter()
+}
+
+dependencies {
+	compile 'com.develhack:develhack-core:[0.9,1.0)'
+	compile 'org.slf4j:slf4j-api:[1.7,1.8)'
+	testCompile 'org.testng:testng:[6.8,6.9)'
+	apt "com.develhack:develhacked-lombok:0.1.4"
+	asciidoclet 'org.asciidoctor:asciidoclet:[1,2)'
+}
+
+sourceSets {
+	main {
+		java {
+			compileClasspath += [ configurations.apt ]
+		}
+	}
+	test {
+		java {
+			compileClasspath += [ configurations.apt ]
+		}
+	}
+}
+
+task javadocJar(type: Jar) {
+	dependsOn javadoc
+	from "${buildDir}/docs/javadoc"
+	classifier = 'javadoc'
+}
+
+task sourcesJar(type: Jar) {
+	from sourceSets.main.allSource
+	classifier = 'sources'
+}
+
+task delombok {
+
+	ant.taskdef(name: 'delombok', classname: 'lombok.delombok.ant.Tasks$Delombok', classpath: configurations.apt.asPath)
+
+	doLast {
+		sourceSets.main.java.srcDirs.each { File srcDir ->
+			ant.delombok(encoding: 'UTF-8', from: srcDir, to: "${buildDir}/delombok", classpath: configurations.compile.asPath)
+		}
+	}
+}
+
+test {
+	useTestNG()
+}
+
+jacocoTestReport {
+	reports {
+		xml.enabled = true
+		html.enabled = true
+	}
+}
+
+if (JavaVersion.current().isJava8Compatible()) {
+	allprojects {
+		tasks.withType(Javadoc) {
+			options.addStringOption('Xdoclint:none', '-quiet')
+		}
+	}
+}
+
+javadoc {
+	dependsOn delombok
+	inputs.dir "${buildDir}/delombok"
+	outputs.dir "${docsDir}/javadoc/${version}"
+
+	title = "Develhack Logger API (${version})"
+
+	source = "${buildDir}/delombok"
+	include '**/*.java'
+	destinationDir = file("${docsDir}/javadoc/${version}")
+
+	options {
+		docletpath = configurations.asciidoclet.files.asType(List)
+		doclet 'org.asciidoctor.Asciidoclet'
+		addStringOption "-base-dir", "${projectDir}"
+		addStringOption "-attribute", "name=${project.name},version=${project.version},title-link=https://github.com/develhack/${project.name}[${project.name} ${project.version}]"
+		locale 'en_US'
+		encoding 'UTF-8'
+		links 'http://docs.oracle.com/javase/8/docs/api/'
+	}
+}
+
+artifacts {
+	archives jar
+	archives javadocJar
+	archives sourcesJar
+}
+
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			from components.java
+			artifact sourcesJar { classifier "sources" }
+			artifact javadocJar { classifier "javadoc" }
+			pom.withXml {
+				asNode().children().last() + {
+					resolveStrategy = DELEGATE_FIRST
+					name project.name
+					description 'The utilities for binary data.'
+					url "https://github.com/develhack/${project.name}"
+					scm {
+						url "https://github.com/develhack/${project.name}.git"
+						connection "https://github.com/develhack/${project.name}.git"
+					}
+					licenses {
+						license {
+							name 'MIT License'
+							url 'http://mit-license.org/'
+							distribution 'repo'
+						}
+					}
+					developers {
+						developer {
+							id 'develhack'
+							name 'Develhack.com'
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+if(hasProperty('BINTRAY_USER') && hasProperty('BINTRAY_API_KEY')) {
+
+	bintray {
+		user = "$BINTRAY_USER"
+		key = "$BINTRAY_API_KEY"
+		publications = ['mavenJava']
+		pkg {
+			userOrg = 'develhack'
+			repo = 'maven'
+			name = 'develhack-logger'
+		}
+	}
+}
+
+defaultTasks 'clean', 'build'
