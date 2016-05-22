@@ -7,16 +7,66 @@ import java.util.Arrays;
 import com.develhack.annotation.assertion.InRange;
 import com.develhack.annotation.assertion.Nonempty;
 import com.develhack.annotation.assertion.Nonnull;
+import com.develhack.annotation.assertion.Positive;
 import com.develhack.annotation.feature.Accessible;
 
 public class ByteArrayAdapter {
+
+	private static final char[] LOWER_DIGITS = "0123456789abcdef".toCharArray();
+	private static final char[] UPPSER_DIGITS = "0123456789ABCDEF".toCharArray();
+
+	public static String toString(byte[] data) {
+		return toString(data, (char) 0, false);
+	}
+
+	public static String toString(byte[] data, char delimiter, boolean upperDigits) {
+
+		if (data == null) return null;
+		if (data.length == 0) return "";
+
+		char[] digits = upperDigits ? UPPSER_DIGITS : LOWER_DIGITS;
+
+		if (delimiter == 0) {
+
+			StringBuilder buff = new StringBuilder((data.length * 2));
+			for (byte b : data) {
+				buff.append(digits[(b >>> 4) & 0xF]);
+				buff.append(digits[b & 0xF]);
+			}
+
+			return buff.toString();
+		}
+
+		StringBuilder buff = new StringBuilder((data.length * 3));
+		for (byte b : data) {
+			buff.append(digits[b >>> 4]);
+			buff.append(digits[b & 0xF]);
+			buff.append(delimiter);
+		}
+		buff.setLength(buff.length() - 1);
+
+		return buff.toString();
+	}
 
 	/** reference of the data specified in the constructor */
 	@Accessible
 	private final byte[] data;
 
+	public ByteArrayAdapter(@Positive int size) {
+		this.data = new byte[size];
+	}
+
 	public ByteArrayAdapter(@Nonnull byte[] data) {
 		this.data = data;
+	}
+
+	public String getHexString(@InRange(from = "0", to = "data.length - 1") int byteOffset,
+			@InRange(from = "1", to = "data.length - byteOffset") int byteLength) {
+
+		checkInRange("byteOffset", byteOffset, 0, data.length - 1);
+		checkInRange("byteLength", byteLength, 1, data.length - byteOffset);
+
+		return toString(getByteUnitValue(byteOffset, byteLength));
 	}
 
 	public byte[] getByteUnitValue(@InRange(from = "0", to = "data.length - 1") int byteOffset,
@@ -85,24 +135,28 @@ public class ByteArrayAdapter {
 		return getBitUnitValueAsInt(bitOffset, bitLength, true);
 	}
 
-	public void setByteUnitValue(@Nonempty byte[] value,
- @InRange(from = "0", to = "data.length - value.length") int byteOffset) {
+	public ByteArrayAdapter setByteUnitValue(@Nonempty byte[] value,
+			@InRange(from = "0", to = "data.length - value.length") int byteOffset) {
 
 		checkInRange("byteOffset", byteOffset, 0, data.length - value.length);
 
 		System.arraycopy(value, 0, data, byteOffset, value.length);
+
+		return this;
 	}
 
-	public void setByteUnitValue(int value, @InRange(from = "0", to = "data.length - 1") int byteOffset,
+	public ByteArrayAdapter setByteUnitValue(int value, @InRange(from = "0", to = "data.length - 1") int byteOffset,
 			@InRange(from = "1", to = "data.length - byteOffset") int byteLength) {
 
 		checkInRange("byteOffset", byteOffset, 0, data.length - 1);
 		checkInRange("byteLength", byteLength, 1, data.length - byteOffset);
 
 		setByteUnitValue0(value, byteOffset, byteLength);
+
+		return this;
 	}
 
-	public void setLittleEndianValue(int value, @InRange(from = "0", to = "data.length - 1") int byteOffset,
+	public ByteArrayAdapter setLittleEndianValue(int value, @InRange(from = "0", to = "data.length - 1") int byteOffset,
 			@InRange(from = "1", to = "data.length - byteOffset") int byteLength) {
 
 		checkInRange("byteOffset", byteOffset, 0, data.length - 1);
@@ -112,9 +166,12 @@ public class ByteArrayAdapter {
 			data[byteOffset] = (byte) value;
 			value >>= Byte.SIZE;
 		}
+
+		return this;
 	}
 
-	public void setBitUnitValue(int value, @InRange(from = "0", to = "(data.length * Byte.SIZE) - 1") long bitOffset,
+	public ByteArrayAdapter setBitUnitValue(int value,
+			@InRange(from = "0", to = "(data.length * Byte.SIZE) - 1") long bitOffset,
 			@InRange(from = "1", to = "(data.length * Byte.SIZE) - bitOffset") long bitLength) {
 
 		checkInRange("bitOffset", bitOffset, 0, (data.length * Byte.SIZE) - 1);
@@ -126,7 +183,7 @@ public class ByteArrayAdapter {
 		if ((bitOffsetInFirstByte | ((int) bitLength) & 7) == 0) {
 			// mask is unnecessary.
 			setByteUnitValue0(value, byteOffset, (int) (bitLength >>> 3));
-			return;
+			return this;
 		}
 
 		int reverseBitIndexInFirstByte = Byte.SIZE - bitOffsetInFirstByte;
@@ -136,7 +193,7 @@ public class ByteArrayAdapter {
 				// not cross byte boundary.
 				int mask = (-1 >>> -bitLength) << reverseBitOffsetInFirstByte;
 				data[byteOffset] = (byte) ((data[byteOffset] & ~mask) | ((value << reverseBitOffsetInFirstByte) & mask));
-				return;
+				return this;
 			}
 		}
 
@@ -162,6 +219,30 @@ public class ByteArrayAdapter {
 			int mask = (-1 >>> -reverseBitIndexInFirstByte);
 			data[byteOffset] = (byte) ((data[byteOffset] & ~mask) | (value & mask));
 		}
+
+		return this;
+	}
+
+	@Override
+	public String toString() {
+		return toString(data);
+	}
+
+	public String toString(char delimiter, boolean upperDigits) {
+		return toString(data, delimiter, upperDigits);
+	}
+
+	@Override
+	public int hashCode() {
+		return Arrays.hashCode(data);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj) return true;
+		if (obj == null) return false;
+		if (getClass() != obj.getClass()) return false;
+		return Arrays.equals(data, ((ByteArrayAdapter) obj).data);
 	}
 
 	private int getByteUnitValueAsInt(int byteOffset, int byteLength, boolean unsigned) {
